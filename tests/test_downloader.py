@@ -3,18 +3,8 @@ from pathlib import Path
 import pytest
 
 from src import config
-from src.downloader import JobManager, fetch_info
-from src.models import DownloadFormat, JobStatus, Quality
-
-
-class _SyncExecutor:
-    """Runs submitted jobs inline so tests don't need to poll background threads."""
-
-    def submit(self, fn, *args, **kwargs):
-        fn(*args, **kwargs)
-
-    def shutdown(self, wait=True):
-        pass
+from src.downloader import _resolve_downloaded_file, download, fetch_info
+from src.models import DownloadFormat, Quality
 
 
 class _FakeYoutubeDL:
@@ -57,21 +47,15 @@ class _FakeYoutubeDL:
 
 
 @pytest.fixture(autouse=True)
-def reset_fake_ydl():
+def fake_ydl(monkeypatch):
     _FakeYoutubeDL.calls = []
     _FakeYoutubeDL.duration = 42
     _FakeYoutubeDL.raise_on_download = None
+    monkeypatch.setattr("src.downloader.yt_dlp.YoutubeDL", _FakeYoutubeDL)
     yield
 
 
-@pytest.fixture
-def manager(monkeypatch):
-    monkeypatch.setattr("src.downloader.yt_dlp.YoutubeDL", _FakeYoutubeDL)
-    return JobManager(executor=_SyncExecutor())
-
-
-def test_fetch_info_returns_simplified_fields(monkeypatch):
-    monkeypatch.setattr("src.downloader.yt_dlp.YoutubeDL", _FakeYoutubeDL)
+def test_fetch_info_returns_simplified_fields():
     info = fetch_info("https://youtube.com/watch?v=abc")
     assert info == {
         "title": "Sample Video",
@@ -83,106 +67,76 @@ def test_fetch_info_returns_simplified_fields(monkeypatch):
     }
 
 
-def test_create_job_completes_and_produces_file(manager):
-    job_id = manager.create_job(
-        "https://youtube.com/watch?v=abc", DownloadFormat.VIDEO, Quality.BEST
+def test_download_returns_bytes_and_reports_progress():
+    events = []
+    result = download(
+        "https://youtube.com/watch?v=abc",
+        DownloadFormat.VIDEO,
+        Quality.BEST,
+        progress_callback=lambda pct, status: events.append((pct, status)),
     )
-    job = manager.get_job(job_id)
-    assert job.status == JobStatus.COMPLETED
-    assert job.progress == 100.0
-    assert job.title == "Sample Video"
-    assert job.filename == f"{job_id}.mp4"
-
-    path = manager.get_file_path(job_id)
-    assert path.exists()
-    assert path.read_bytes() == b"fake-media-bytes"
+    assert result.title == "Sample Video"
+    assert result.filename.endswith(".mp4")
+    assert result.data == b"fake-media-bytes"
+    assert events[-1] == (100.0, "completed")
+    assert (50.0, "downloading") in events
+    assert (99.0, "processing") in events
 
 
-def test_create_job_audio_uses_mp3_extension_and_postprocessor(manager):
-    job_id = manager.create_job(
-        "https://youtube.com/watch?v=abc", DownloadFormat.AUDIO, Quality.BEST
-    )
-    job = manager.get_job(job_id)
-    assert job.status == JobStatus.COMPLETED
-    assert job.filename == f"{job_id}.mp3"
+def test_download_works_without_progress_callback():
+    result = download("https://youtube.com/watch?v=abc", DownloadFormat.VIDEO, Quality.BEST)
+    assert result.data == b"fake-media-bytes"
+
+
+def test_download_audio_uses_mp3_extension_and_postprocessor():
+    result = download("https://youtube.com/watch?v=abc", DownloadFormat.AUDIO, Quality.BEST)
+    assert result.filename.endswith(".mp3")
 
     download_call = next(c for c in _FakeYoutubeDL.calls if c["download"])
     assert download_call["opts"]["postprocessors"][0]["key"] == "FFmpegExtractAudio"
 
 
-def test_quality_cap_selects_matching_format_string(manager):
-    manager.create_job("https://youtube.com/watch?v=abc", DownloadFormat.VIDEO, Quality.Q720)
+def test_quality_cap_selects_matching_format_string():
+    download("https://youtube.com/watch?v=abc", DownloadFormat.VIDEO, Quality.Q720)
     download_call = next(c for c in _FakeYoutubeDL.calls if c["download"])
     assert download_call["opts"]["format"] == config.QUALITY_FORMAT_MAP["720p"]
 
 
-def test_job_marked_failed_on_download_exception(manager):
+def test_opts_always_point_yt_dlp_at_bundled_ffmpeg():
+    download("https://youtube.com/watch?v=abc", DownloadFormat.VIDEO, Quality.BEST)
+    download_call = next(c for c in _FakeYoutubeDL.calls if c["download"])
+    assert download_call["opts"]["ffmpeg_location"] == config.FFMPEG_LOCATION
+
+
+def test_download_propagates_exception():
     _FakeYoutubeDL.raise_on_download = RuntimeError("network exploded")
-    job_id = manager.create_job(
-        "https://youtube.com/watch?v=abc", DownloadFormat.VIDEO, Quality.BEST
-    )
-    job = manager.get_job(job_id)
-    assert job.status == JobStatus.FAILED
-    assert "network exploded" in job.error
+    with pytest.raises(RuntimeError, match="network exploded"):
+        download("https://youtube.com/watch?v=abc", DownloadFormat.VIDEO, Quality.BEST)
 
 
-def test_duration_over_limit_fails_job_without_downloading(manager, monkeypatch):
+def test_duration_over_limit_raises_without_downloading(monkeypatch):
     monkeypatch.setattr(config, "MAX_VIDEO_DURATION_SECONDS", 10)
     _FakeYoutubeDL.duration = 42
-    job_id = manager.create_job(
-        "https://youtube.com/watch?v=abc", DownloadFormat.VIDEO, Quality.BEST
-    )
-    job = manager.get_job(job_id)
-    assert job.status == JobStatus.FAILED
-    assert "exceeds" in job.error
+    with pytest.raises(ValueError, match="exceeds"):
+        download("https://youtube.com/watch?v=abc", DownloadFormat.VIDEO, Quality.BEST)
     assert all(not c["download"] for c in _FakeYoutubeDL.calls)
 
 
-def test_duration_check_disabled_when_limit_is_zero(manager, monkeypatch):
+def test_duration_check_disabled_when_limit_is_zero(monkeypatch):
     monkeypatch.setattr(config, "MAX_VIDEO_DURATION_SECONDS", 0)
     _FakeYoutubeDL.duration = 999999
-    job_id = manager.create_job(
-        "https://youtube.com/watch?v=abc", DownloadFormat.VIDEO, Quality.BEST
-    )
-    job = manager.get_job(job_id)
-    assert job.status == JobStatus.COMPLETED
+    result = download("https://youtube.com/watch?v=abc", DownloadFormat.VIDEO, Quality.BEST)
+    assert result.data == b"fake-media-bytes"
 
 
-def test_get_job_unknown_returns_none(manager):
-    assert manager.get_job("does-not-exist") is None
-
-
-def test_get_file_path_none_when_job_unknown(manager):
-    assert manager.get_file_path("does-not-exist") is None
-
-
-def test_get_file_path_none_when_not_completed(manager, monkeypatch):
-    monkeypatch.setattr("src.downloader.yt_dlp.YoutubeDL", _FakeYoutubeDL)
-    job_id = "pending-job"
-    from src.models import JobInfo
-
-    manager._jobs[job_id] = JobInfo(
-        job_id=job_id,
-        url="https://x",
-        format=DownloadFormat.VIDEO,
-        quality=Quality.BEST,
-        status=JobStatus.DOWNLOADING,
-    )
-    assert manager.get_file_path(job_id) is None
-
-
-def test_resolve_downloaded_file_raises_when_missing(manager):
+def test_resolve_downloaded_file_raises_when_missing(tmp_path):
     with pytest.raises(FileNotFoundError):
-        manager._resolve_downloaded_file("no-such-job")
+        _resolve_downloaded_file(tmp_path, "no-such-job")
 
 
-def test_shutdown_delegates_to_executor():
-    calls = []
-
-    class _TrackingExecutor(_SyncExecutor):
-        def shutdown(self, wait=True):
-            calls.append(wait)
-
-    manager = JobManager(executor=_TrackingExecutor())
-    manager.shutdown()
-    assert calls == [False]
+def test_resolve_downloaded_file_ignores_partial_files(tmp_path):
+    (tmp_path / "job1.part").write_bytes(b"partial")
+    final = tmp_path / "job1.mp4"
+    final.write_bytes(b"done")
+    resolved = _resolve_downloaded_file(tmp_path, "job1")
+    assert resolved == final

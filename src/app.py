@@ -2,75 +2,152 @@
 app.py
 ======
 
-FastAPI application: REST API + static web UI for the Video Downloader
-Service.
+Streamlit entrypoint for the Video Downloader Service.
 """
 
-from contextlib import asynccontextmanager
+from typing import Optional
 
-import yt_dlp
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
+import streamlit as st
 
 from src import config
-from src.downloader import fetch_info, job_manager
-from src.models import DownloadRequest, JobInfo, JobStatus, UrlRequest, VideoInfo
+from src.downloader import download, fetch_info
+from src.models import DownloadFormat, Quality
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    yield
-    job_manager.shutdown()
+def check_password() -> bool:
+    """Simple password gate backed by st.secrets.
+
+    Standard Streamlit recipe: https://docs.streamlit.io/knowledge-base/deploy/authentication-without-sso
+    Locally, set the password in .streamlit/secrets.toml (gitignored).
+    On Streamlit Community Cloud, set it in the app's own Secrets UI -
+    it is never committed to the repo.
+    """
+
+    def password_entered() -> None:
+        expected = st.secrets.get(config.PASSWORD_SECRET_KEY)
+        if expected and st.session_state.get("password_input") == expected:
+            st.session_state["password_correct"] = True
+            del st.session_state["password_input"]
+        else:
+            st.session_state["password_correct"] = False
+
+    if st.session_state.get("password_correct", False):
+        return True
+
+    st.text_input(
+        "Password", type="password", on_change=password_entered, key="password_input"
+    )
+    if "password_correct" in st.session_state:
+        st.error("Incorrect password")
+    return False
 
 
-app = FastAPI(title=config.APP_TITLE, version=config.APP_VERSION, lifespan=lifespan)
-
-app.mount("/static", StaticFiles(directory=str(config.STATIC_DIR)), name="static")
-
-
-@app.get("/")
-def index() -> FileResponse:
-    return FileResponse(str(config.STATIC_DIR / "index.html"))
-
-
-@app.get("/api/health")
-def health() -> dict:
-    return {"status": "ok"}
+def format_duration(seconds: Optional[float]) -> str:
+    if seconds is None:
+        return ""
+    seconds = int(seconds)
+    hours, remainder = divmod(seconds, 3600)
+    minutes, secs = divmod(remainder, 60)
+    return f"{hours}:{minutes:02d}:{secs:02d}" if hours else f"{minutes}:{secs:02d}"
 
 
-@app.post("/api/info", response_model=VideoInfo)
-def get_info(payload: UrlRequest) -> dict:
-    try:
-        return fetch_info(str(payload.url))
-    except yt_dlp.utils.DownloadError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+st.set_page_config(page_title=config.APP_TITLE, page_icon=config.APP_ICON)
 
+if not check_password():
+    st.stop()
 
-@app.post("/api/download")
-def start_download(payload: DownloadRequest) -> dict:
-    job_id = job_manager.create_job(str(payload.url), payload.format, payload.quality)
-    return {"job_id": job_id}
+st.title(f"{config.APP_ICON} {config.APP_TITLE}")
+st.caption(
+    "Paste a video URL (YouTube and hundreds of other sites via "
+    "[yt-dlp](https://github.com/yt-dlp/yt-dlp)). Only download content "
+    "you own or are authorized to."
+)
 
+url = st.text_input(
+    "Video URL", placeholder="https://www.youtube.com/watch?v=...", key="url_input"
+)
 
-@app.get("/api/jobs/{job_id}", response_model=JobInfo)
-def job_status(job_id: str) -> JobInfo:
-    job = job_manager.get_job(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="Job not found")
-    return job
+col1, col2 = st.columns(2)
+with col1:
+    format_label = st.selectbox(
+        "Format", ["Video (mp4)", "Audio only (mp3)"], key="format_select"
+    )
+with col2:
+    quality_label = st.selectbox(
+        "Quality",
+        ["Best", "1080p", "720p", "480p"],
+        disabled=format_label.startswith("Audio"),
+        key="quality_select",
+    )
 
+selected_format = DownloadFormat.AUDIO if format_label.startswith("Audio") else DownloadFormat.VIDEO
+selected_quality = (
+    Quality.BEST if selected_format == DownloadFormat.AUDIO else Quality(quality_label.lower())
+)
 
-@app.get("/api/jobs/{job_id}/file")
-def job_file(job_id: str) -> FileResponse:
-    job = job_manager.get_job(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="Job not found")
-    if job.status != JobStatus.COMPLETED:
-        raise HTTPException(
-            status_code=409, detail=f"Job is {job.status.value}, not ready for download"
+info_col, download_col = st.columns(2)
+get_info_clicked = info_col.button(
+    "Get Info", use_container_width=True, disabled=not url, key="info_button"
+)
+download_clicked = download_col.button(
+    "Download",
+    type="primary",
+    use_container_width=True,
+    disabled=not url,
+    key="download_button",
+)
+
+if get_info_clicked:
+    with st.spinner("Fetching info..."):
+        try:
+            info = fetch_info(url)
+        except Exception as exc:
+            st.error(str(exc))
+            st.session_state.pop("last_info", None)
+        else:
+            st.session_state["last_info"] = info
+
+if "last_info" in st.session_state:
+    info = st.session_state["last_info"]
+    thumb_col, meta_col = st.columns([1, 3])
+    if info.get("thumbnail"):
+        thumb_col.image(info["thumbnail"])
+    with meta_col:
+        st.subheader(info.get("title") or "Untitled")
+        meta = " · ".join(
+            part
+            for part in [info.get("uploader"), format_duration(info.get("duration"))]
+            if part
         )
-    path = job_manager.get_file_path(job_id)
-    if path is None or not path.exists():
-        raise HTTPException(status_code=404, detail="Downloaded file not found")
-    return FileResponse(path, filename=path.name)
+        if meta:
+            st.caption(meta)
+
+if download_clicked:
+    progress_bar = st.progress(0.0)
+    status_text = st.empty()
+
+    def on_progress(pct: float, status: str) -> None:
+        progress_bar.progress(min(pct, 100.0) / 100.0)
+        status_text.text(f"{status.capitalize()}... {pct:.0f}%")
+
+    try:
+        result = download(url, selected_format, selected_quality, progress_callback=on_progress)
+    except Exception as exc:
+        status_text.empty()
+        progress_bar.empty()
+        st.error(str(exc))
+        st.session_state.pop("last_result", None)
+    else:
+        status_text.text("Done!")
+        st.session_state["last_result"] = result
+
+if "last_result" in st.session_state:
+    result = st.session_state["last_result"]
+    st.success(f"Ready: {result.title or result.filename}")
+    st.download_button(
+        "Save file",
+        data=result.data,
+        file_name=result.filename,
+        use_container_width=True,
+        key="save_file_button",
+    )

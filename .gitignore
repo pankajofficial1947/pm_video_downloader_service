@@ -10,14 +10,8 @@ __pycache__/
 .coverage
 htmlcov/
 
-# Environment variables
-.env
-
-# Runtime data (keep the folders, ignore their contents)
-downloads/*
-logs/*
-!downloads/.gitkeep
-!logs/.gitkeep
+# Secrets - never commit the real one, only secrets.toml.example
+.streamlit/secrets.toml
 
 # OS
 .DS_Store

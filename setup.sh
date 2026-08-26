@@ -10,9 +10,7 @@
 #   3. Activates the virtual environment
 #   4. Upgrades pip and build tools
 #   5. Installs all required packages
-#   6. Creates project directories
-#   7. Creates a .env file (if missing)
-#   8. Checks for ffmpeg (required by yt-dlp to merge/convert media)
+#   6. Creates a local secrets.toml (if missing) from the example
 #
 # Usage:
 #     chmod +x setup.sh
@@ -76,59 +74,23 @@ python -m pip install --upgrade pip setuptools wheel
 
 echo ""
 echo "Installing project dependencies..."
+echo "(ffmpeg comes bundled via the imageio-ffmpeg package - no"
+echo " separate system install needed.)"
 
 pip install -r requirements.txt
 
 ###############################################
-# Create Project Directories
+# Create local secrets.toml
 ###############################################
 
-echo ""
-echo "Creating project folders..."
+if [ ! -f ".streamlit/secrets.toml" ]; then
 
-mkdir -p downloads
-mkdir -p logs
-mkdir -p tests
+    echo ""
+    echo "Creating .streamlit/secrets.toml from the example..."
+    echo "Edit it to set your own password before running the app."
 
-###############################################
-# Create .env
-###############################################
+    cp .streamlit/secrets.toml.example .streamlit/secrets.toml
 
-if [ ! -f ".env" ]; then
-
-    if [ -f ".env.example" ]; then
-
-        echo ""
-        echo "Creating .env file..."
-
-        cp .env.example .env
-
-    else
-
-        echo ""
-        echo "Creating blank .env..."
-
-        touch .env
-
-    fi
-
-fi
-
-###############################################
-# Check ffmpeg
-###############################################
-
-echo ""
-
-if command -v ffmpeg &> /dev/null; then
-    echo "ffmpeg found: $(ffmpeg -version | head -n 1)"
-else
-    echo "WARNING: ffmpeg was not found on PATH."
-    echo "yt-dlp needs it to merge separate video/audio streams and to"
-    echo "extract audio-only downloads. Install it with:"
-    echo "    macOS:   brew install ffmpeg"
-    echo "    Ubuntu:  sudo apt install ffmpeg"
-    echo "    Windows: https://ffmpeg.org/download.html"
 fi
 
 ###############################################
@@ -146,9 +108,10 @@ echo "    source .venv/bin/activate"
 echo ""
 echo "To start the project:"
 echo ""
-echo "    uvicorn src.app:app --reload --host 0.0.0.0 --port 8000"
+echo "    streamlit run src/app.py"
 echo ""
-echo "Then open http://localhost:8000 in your browser."
+echo "Then open http://localhost:8501 in your browser and log in with"
+echo "the password set in .streamlit/secrets.toml."
 echo ""
 echo "Happy Coding!"
 echo ""

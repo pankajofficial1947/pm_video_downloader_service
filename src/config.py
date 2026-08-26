@@ -2,19 +2,16 @@
 config.py
 =========
 
-Central configuration for the Video Downloader Service.
+Central configuration for the Video Downloader Service (Streamlit app).
 
-Loads environment variables (via .env, see .env.example), defines
-project paths, and holds the yt-dlp format selectors and resource
-limits used across the app.
+Holds project paths, the yt-dlp format/quality maps, and resource
+limits. The only secret (the app password) lives in st.secrets, never
+here - see .streamlit/secrets.toml.example.
 """
 
-import os
 from pathlib import Path
 
-from dotenv import load_dotenv
-
-load_dotenv()
+import imageio_ffmpeg
 
 
 # =============================================================================
@@ -23,39 +20,44 @@ load_dotenv()
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 SRC_DIR = ROOT_DIR / "src"
-STATIC_DIR = SRC_DIR / "static"
-DOWNLOAD_DIR = ROOT_DIR / "downloads"
-LOG_DIR = ROOT_DIR / "logs"
-TEST_DIR = ROOT_DIR / "tests"
 
 
 # =============================================================================
-# App Metadata / Server
+# App Metadata
 # =============================================================================
 
 APP_TITLE = "Video Downloader Service"
-APP_VERSION = "0.1.0"
+APP_ICON = "🎬"
 
-HOST = os.getenv("HOST", "0.0.0.0")
-PORT = int(os.getenv("PORT", "8000"))
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+# Key looked up in st.secrets to gate access (see src/app.py's
+# check_password()). Set locally in .streamlit/secrets.toml (gitignored)
+# and, when deployed, in Streamlit Community Cloud's own Secrets UI -
+# never committed.
+PASSWORD_SECRET_KEY = "app_password"
+
+
+# =============================================================================
+# ffmpeg
+# =============================================================================
+
+# yt-dlp needs ffmpeg to merge separate video/audio streams and to
+# extract audio-only downloads. imageio-ffmpeg ships a static ffmpeg
+# binary as a plain pip dependency (no Homebrew/apt install, no admin
+# rights needed) and works identically on a local machine and on
+# Streamlit Community Cloud's container - so yt-dlp is always pointed
+# at this binary explicitly rather than relying on a system install.
+FFMPEG_LOCATION = imageio_ffmpeg.get_ffmpeg_exe()
 
 
 # =============================================================================
 # Download Behaviour
 # =============================================================================
 
-# How many downloads yt-dlp will run at the same time. Each one is a
-# real network + (for video) ffmpeg-merge workload, so this bounds
-# both bandwidth and CPU use rather than letting every submitted job
-# start immediately.
-MAX_CONCURRENT_DOWNLOADS = int(os.getenv("MAX_CONCURRENT_DOWNLOADS", "2"))
-
 # Hard cap on source video duration, in seconds. Checked against the
 # video's own metadata before the real download starts (see
-# downloader._run_job) so an oversized request fails fast instead of
-# filling disk with a multi-hour file. 0 disables the check entirely.
-MAX_VIDEO_DURATION_SECONDS = int(os.getenv("MAX_VIDEO_DURATION_SECONDS", "21600"))  # 6 hours
+# downloader.download()) so an oversized request fails fast instead of
+# running for hours on shared hosting. 0 disables the check.
+MAX_VIDEO_DURATION_SECONDS = 21600  # 6 hours
 
 # yt-dlp format selectors per requested quality cap. mp4/m4a streams
 # are preferred so ffmpeg can mux the pair without re-encoding; each
@@ -79,11 +81,3 @@ QUALITY_FORMAT_MAP = {
 
 AUDIO_CODEC = "mp3"
 AUDIO_QUALITY = "192"
-
-
-# =============================================================================
-# Create Required Directories
-# =============================================================================
-
-for directory in (DOWNLOAD_DIR, LOG_DIR):
-    directory.mkdir(parents=True, exist_ok=True)

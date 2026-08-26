@@ -14,14 +14,13 @@ packages via pip (see requirements.txt) - each remains governed by its
 own license, independent of the notice above:
 
 * yt-dlp (https://github.com/yt-dlp/yt-dlp) - Unlicense (public domain).
-* FastAPI (https://github.com/fastapi/fastapi) - MIT License.
-* Uvicorn (https://github.com/encode/uvicorn) - BSD-3-Clause License.
-* Pydantic (https://github.com/pydantic/pydantic) - MIT License.
-
-This project also shells out to a system-installed ffmpeg binary (not
-bundled or distributed with this repository) to merge/convert media -
-ffmpeg's own license (LGPL/GPL, build-dependent) applies to that binary
-independently. See https://ffmpeg.org/legal.html.
+* Streamlit (https://github.com/streamlit/streamlit) - Apache License 2.0.
+* imageio-ffmpeg (https://github.com/imageio/imageio-ffmpeg) -
+  BSD-2-Clause License. It provides a static ffmpeg binary for the
+  current platform, used for merging/converting media - the ffmpeg
+  binary itself remains governed by ffmpeg's own license (LGPL/GPL,
+  build-dependent), independent of imageio-ffmpeg's own license. See
+  https://ffmpeg.org/legal.html.
 
 ---
 
