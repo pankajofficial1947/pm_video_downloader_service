@@ -1,0 +1,12 @@
+services:
+  video-downloader:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./downloads:/app/downloads
+    environment:
+      - LOG_LEVEL=INFO
+      - MAX_CONCURRENT_DOWNLOADS=2
+      - MAX_VIDEO_DURATION_SECONDS=21600
+    restart: unless-stopped

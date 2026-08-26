@@ -1,0 +1,23 @@
+# Virtual environment
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# Test / coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment variables
+.env
+
+# Runtime data (keep the folders, ignore their contents)
+downloads/*
+logs/*
+!downloads/.gitkeep
+!logs/.gitkeep
+
+# OS
+.DS_Store
