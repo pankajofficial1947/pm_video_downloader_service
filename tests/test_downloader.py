@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from src import config
-from src.downloader import _resolve_downloaded_file, download, fetch_info
-from src.models import DownloadFormat, Quality
+import config
+from downloader import _resolve_downloaded_file, download, fetch_info
+from models import DownloadFormat, Quality
 
 
 class _FakeYoutubeDL:
@@ -51,7 +51,7 @@ def fake_ydl(monkeypatch):
     _FakeYoutubeDL.calls = []
     _FakeYoutubeDL.duration = 42
     _FakeYoutubeDL.raise_on_download = None
-    monkeypatch.setattr("src.downloader.yt_dlp.YoutubeDL", _FakeYoutubeDL)
+    monkeypatch.setattr("downloader.yt_dlp.YoutubeDL", _FakeYoutubeDL)
     yield
 
 

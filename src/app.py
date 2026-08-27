@@ -9,9 +9,9 @@ from typing import Optional
 
 import streamlit as st
 
-from src import config
-from src.downloader import download, fetch_info
-from src.models import DownloadFormat, Quality
+import config
+from downloader import download, fetch_info
+from models import DownloadFormat, Quality
 
 
 def check_password() -> bool:

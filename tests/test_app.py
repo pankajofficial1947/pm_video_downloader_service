@@ -2,8 +2,8 @@ from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
-from src import config
-from src.models import DownloadResult
+import config
+from models import DownloadResult
 
 APP_PATH = str(Path(__file__).resolve().parent.parent / "src" / "app.py")
 PASSWORD = "secret123"
@@ -47,7 +47,7 @@ def test_allows_correct_password_and_renders_app():
 
 def test_get_info_renders_video_metadata(monkeypatch):
     monkeypatch.setattr(
-        "src.downloader.fetch_info",
+        "downloader.fetch_info",
         lambda url: {
             "title": "Cool Video",
             "duration": 65,
@@ -68,7 +68,7 @@ def test_get_info_shows_error_on_failure(monkeypatch):
     def boom(url):
         raise ValueError("nope")
 
-    monkeypatch.setattr("src.downloader.fetch_info", boom)
+    monkeypatch.setattr("downloader.fetch_info", boom)
     at = _authenticated_app()
     at.text_input(key="url_input").input("https://youtube.com/watch?v=x").run()
     at.button(key="info_button").click().run()
@@ -77,7 +77,7 @@ def test_get_info_shows_error_on_failure(monkeypatch):
 
 def test_download_flow_offers_download_button(monkeypatch):
     monkeypatch.setattr(
-        "src.downloader.download",
+        "downloader.download",
         lambda url, fmt, quality, progress_callback=None: DownloadResult(
             title="Cool Video", filename="abc.mp4", data=b"data"
         ),
@@ -94,7 +94,7 @@ def test_download_flow_shows_error_on_failure(monkeypatch):
     def boom(url, fmt, quality, progress_callback=None):
         raise ValueError("duration too long")
 
-    monkeypatch.setattr("src.downloader.download", boom)
+    monkeypatch.setattr("downloader.download", boom)
     at = _authenticated_app()
     at.text_input(key="url_input").input("https://youtube.com/watch?v=x").run()
     at.button(key="download_button").click().run()

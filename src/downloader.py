@@ -16,8 +16,8 @@ from typing import Callable, Optional
 
 import yt_dlp
 
-from src import config
-from src.models import DownloadFormat, DownloadResult, Quality
+import config
+from models import DownloadFormat, DownloadResult, Quality
 
 ProgressCallback = Callable[[float, str], None]
 
