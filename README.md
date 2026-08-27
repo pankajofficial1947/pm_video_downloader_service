@@ -1,7 +1,7 @@
 # pm_video_downloader_service
 # 🎬 Video Downloader Service
 
-A password-gated [Streamlit](https://streamlit.io/) app that downloads videos or audio from YouTube and hundreds of other sites, powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp). Paste a URL, preview its title/thumbnail, pick a format/quality, and save the file - runs locally or free on Streamlit Community Cloud so it's reachable from your phone too.
+A [Streamlit](https://streamlit.io/) app that downloads videos or audio from YouTube and hundreds of other sites, powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp). Paste a URL, preview its title/thumbnail, pick a format/quality, and save the file - runs locally or free on Streamlit Community Cloud so it's reachable from your phone too.
 
 ---
 
@@ -33,7 +33,9 @@ It supports every site `yt-dlp` supports (YouTube plus [~1800 others](https://gi
 
 # Legal Notice
 
-Only download videos you own, that are in the public domain, or that you are otherwise authorized to save a copy of. Downloading copyrighted content without permission can violate a platform's Terms of Service and/or copyright law in your jurisdiction - that responsibility is the operator's/user's, not something this codebase checks for or grants permission for. See [LICENSE](LICENSE)'s "Usage responsibility" section. This is also *why the app is password-gated by default* (see [Security](#security)) rather than built for a public, anonymous audience.
+Only download videos you own, that are in the public domain, or that you are otherwise authorized to save a copy of. Downloading copyrighted content without permission can violate a platform's Terms of Service and/or copyright law in your jurisdiction - that responsibility is the operator's/user's, not something this codebase checks for or grants permission for. See [LICENSE](LICENSE)'s "Usage responsibility" section.
+
+**Note:** this app has no access control (see [Security](#security)) - if deployed to Streamlit Community Cloud, anyone with the URL can use it. Keep the deployed link private if you don't want that.
 
 ---
 
@@ -47,7 +49,6 @@ Only download videos you own, that are in the public domain, or that you are oth
 * **Duration guard** - rejects videos longer than `MAX_VIDEO_DURATION_SECONDS` (default 6 hours), checked before downloading.
 * **No playlists by accident** - `noplaylist` is always on, so a channel/playlist URL downloads just the one linked video.
 * **No system ffmpeg install** - bundled via the `imageio-ffmpeg` pip package, so it works the same on your laptop and on Streamlit Community Cloud with no Homebrew/apt step.
-* **Password-gated** - simple `st.secrets`-backed password prompt, so a link isn't the same as public access.
 
 ---
 
@@ -64,13 +65,12 @@ Only download videos you own, that are in the public domain, or that you are oth
 ```
 pm_video_downloader_service/
 ├── .streamlit/
-│   ├── config.toml             # Theme
-│   └── secrets.toml.example    # Template for the password secret
+│   └── config.toml       # Theme
 ├── src/
-│   ├── app.py                  # Streamlit entrypoint (password gate + UI)
-│   ├── config.py                # Paths, ffmpeg location, format/quality maps
-│   ├── downloader.py             # yt-dlp wrapper: fetch_info() / download()
-│   └── models.py                 # DownloadFormat/Quality enums, DownloadResult
+│   ├── app.py              # Streamlit entrypoint (UI)
+│   ├── config.py            # Paths, ffmpeg location, format/quality maps
+│   ├── downloader.py         # yt-dlp wrapper: fetch_info() / download()
+│   └── models.py              # DownloadFormat/Quality enums, DownloadResult
 ├── tests/
 │   ├── test_downloader.py
 │   └── test_app.py
@@ -102,7 +102,7 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-This creates a virtual environment (`.venv/`), installs `requirements.txt`, and creates `.streamlit/secrets.toml` from the example (if it doesn't already exist) - **edit that file to set your own password** before running the app.
+This creates a virtual environment (`.venv/`) and installs `requirements.txt`.
 
 ## 4. Launch the app
 
@@ -111,7 +111,7 @@ source .venv/bin/activate
 streamlit run src/app.py
 ```
 
-Open **http://localhost:8501**, enter the password from `.streamlit/secrets.toml`, and go.
+Open **http://localhost:8501** and go.
 
 ---
 
@@ -119,7 +119,6 @@ Open **http://localhost:8501**, enter the password from `.streamlit/secrets.toml
 
 | Setting | Where | Description |
 |---|---|---|
-| `app_password` | `.streamlit/secrets.toml` (local) or Streamlit Cloud's Secrets UI (deployed) | The one password gating the app. Never commit the real value. |
 | `MAX_VIDEO_DURATION_SECONDS` | `src/config.py` | Reject videos longer than this before downloading; `0` disables the check. Default 21600 (6h). |
 | `QUALITY_FORMAT_MAP` / `AUDIO_CODEC` / `AUDIO_QUALITY` | `src/config.py` | yt-dlp format selectors per quality option. |
 
@@ -146,14 +145,11 @@ This gets you a stable HTTPS URL reachable from any device, for free:
    (or create the repo on github.com and `git push` yourself).
 2. Go to **[share.streamlit.io](https://share.streamlit.io)**, sign in, and click **New app**.
 3. Pick this repo/branch and set the main file path to `src/app.py`.
-4. Before (or right after) deploying, open the app's **Settings → Secrets** in the Streamlit Cloud dashboard and add:
-   ```toml
-   app_password = "your-own-password-here"
-   ```
-   This is the cloud equivalent of your local `.streamlit/secrets.toml` - it's never read from the repo itself.
-5. Deploy. You'll get a `https://<something>.streamlit.app` URL - bookmark it on your phone.
+4. Deploy. You'll get a `https://<something>.streamlit.app` URL - bookmark it on your phone.
 
 No `packages.txt`/apt step is needed for ffmpeg - `imageio-ffmpeg` (in `requirements.txt`) handles that identically to your local machine.
+
+**Remember:** there is no login on this app (see [Security](#security)) - that URL works for anyone who has it.
 
 ---
 
@@ -165,14 +161,14 @@ pytest
 ```
 
 * `tests/test_downloader.py` mocks `yt_dlp.YoutubeDL` directly - no real network requests, no ffmpeg required to run the suite.
-* `tests/test_app.py` uses Streamlit's own `AppTest` framework to drive the actual `src/app.py` script headlessly (password gate, info preview, download flow), mocking `src.downloader.fetch_info`/`download`.
+* `tests/test_app.py` uses Streamlit's own `AppTest` framework to drive the actual `src/app.py` script headlessly (info preview, download flow), mocking `downloader.fetch_info`/`download`.
 
 ---
 
 # Security
 
-* **Password gate, not real auth** - `st.secrets`-backed and fine for personal use, but it's a single shared password with no rate limiting, sessions, or audit log. Don't treat it as enterprise-grade access control.
-* **SSRF-adjacent risk**: `yt-dlp`'s generic extractor will attempt to fetch whatever URL it's given, including internal/private addresses, if no site-specific extractor claims it first. This is a reason to keep the app password private, not just a formality.
+* **No access control** - anyone who has the deployed URL can use the app. Keep the link private, or put it behind your own access layer (e.g. a reverse proxy with auth, or Streamlit Cloud's private-app viewer allowlist) if that matters to you.
+* **SSRF-adjacent risk**: `yt-dlp`'s generic extractor will attempt to fetch whatever URL it's given, including internal/private addresses, if no site-specific extractor claims it first. Worth keeping in mind if you ever do add access control and are relying on it for more than convenience.
 * **Resource limits**: `MAX_VIDEO_DURATION_SECONDS` bounds how large a single download can get; there's no persistent disk quota to worry about since files are held in memory only for the duration of one download/serve cycle, not written to permanent storage.
 
 ---
@@ -180,7 +176,7 @@ pytest
 # Future Enhancements
 
 * Optional playlist support (currently always disabled)
-* Per-user accounts instead of one shared password
+* Optional access control (password or otherwise) for deployments where that matters
 * Download history / re-download without re-entering a URL
 * Simple rate limiting per session
 

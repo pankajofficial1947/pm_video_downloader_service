@@ -5,8 +5,7 @@ config.py
 Central configuration for the Video Downloader Service (Streamlit app).
 
 Holds project paths, the yt-dlp format/quality maps, and resource
-limits. The only secret (the app password) lives in st.secrets, never
-here - see .streamlit/secrets.toml.example.
+limits.
 """
 
 from pathlib import Path
@@ -28,12 +27,6 @@ SRC_DIR = ROOT_DIR / "src"
 
 APP_TITLE = "Video Downloader Service"
 APP_ICON = "🎬"
-
-# Key looked up in st.secrets to gate access (see src/app.py's
-# check_password()). Set locally in .streamlit/secrets.toml (gitignored)
-# and, when deployed, in Streamlit Community Cloud's own Secrets UI -
-# never committed.
-PASSWORD_SECRET_KEY = "app_password"
 
 
 # =============================================================================

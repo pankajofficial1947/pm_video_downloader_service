@@ -10,7 +10,6 @@
 #   3. Activates the virtual environment
 #   4. Upgrades pip and build tools
 #   5. Installs all required packages
-#   6. Creates a local secrets.toml (if missing) from the example
 #
 # Usage:
 #     chmod +x setup.sh
@@ -80,20 +79,6 @@ echo " separate system install needed.)"
 pip install -r requirements.txt
 
 ###############################################
-# Create local secrets.toml
-###############################################
-
-if [ ! -f ".streamlit/secrets.toml" ]; then
-
-    echo ""
-    echo "Creating .streamlit/secrets.toml from the example..."
-    echo "Edit it to set your own password before running the app."
-
-    cp .streamlit/secrets.toml.example .streamlit/secrets.toml
-
-fi
-
-###############################################
 # Finished
 ###############################################
 
@@ -110,8 +95,7 @@ echo "To start the project:"
 echo ""
 echo "    streamlit run src/app.py"
 echo ""
-echo "Then open http://localhost:8501 in your browser and log in with"
-echo "the password set in .streamlit/secrets.toml."
+echo "Then open http://localhost:8501 in your browser."
 echo ""
 echo "Happy Coding!"
 echo ""

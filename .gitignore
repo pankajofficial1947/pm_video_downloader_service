@@ -10,8 +10,5 @@ __pycache__/
 .coverage
 htmlcov/
 
-# Secrets - never commit the real one, only secrets.toml.example
-.streamlit/secrets.toml
-
 # OS
 .DS_Store

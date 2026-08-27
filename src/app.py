@@ -14,34 +14,6 @@ from downloader import download, fetch_info
 from models import DownloadFormat, Quality
 
 
-def check_password() -> bool:
-    """Simple password gate backed by st.secrets.
-
-    Standard Streamlit recipe: https://docs.streamlit.io/knowledge-base/deploy/authentication-without-sso
-    Locally, set the password in .streamlit/secrets.toml (gitignored).
-    On Streamlit Community Cloud, set it in the app's own Secrets UI -
-    it is never committed to the repo.
-    """
-
-    def password_entered() -> None:
-        expected = st.secrets.get(config.PASSWORD_SECRET_KEY)
-        if expected and st.session_state.get("password_input") == expected:
-            st.session_state["password_correct"] = True
-            del st.session_state["password_input"]
-        else:
-            st.session_state["password_correct"] = False
-
-    if st.session_state.get("password_correct", False):
-        return True
-
-    st.text_input(
-        "Password", type="password", on_change=password_entered, key="password_input"
-    )
-    if "password_correct" in st.session_state:
-        st.error("Incorrect password")
-    return False
-
-
 def format_duration(seconds: Optional[float]) -> str:
     if seconds is None:
         return ""
@@ -52,9 +24,6 @@ def format_duration(seconds: Optional[float]) -> str:
 
 
 st.set_page_config(page_title=config.APP_TITLE, page_icon=config.APP_ICON)
-
-if not check_password():
-    st.stop()
 
 st.title(f"{config.APP_ICON} {config.APP_TITLE}")
 st.caption(
