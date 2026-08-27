@@ -8,6 +8,8 @@ Holds project paths, the yt-dlp format/quality maps, and resource
 limits.
 """
 
+import os
+import stat
 from pathlib import Path
 
 import imageio_ffmpeg
@@ -40,6 +42,21 @@ APP_ICON = "🎬"
 # Streamlit Community Cloud's container - so yt-dlp is always pointed
 # at this binary explicitly rather than relying on a system install.
 FFMPEG_LOCATION = imageio_ffmpeg.get_ffmpeg_exe()
+
+# Some deployment platforms' build/dependency-caching pipelines don't
+# reliably preserve the executable bit on binaries bundled as package
+# data (a known class of issue, not specific to any one package) -
+# without it, yt-dlp's own ffmpeg check fails and reports "ffmpeg is
+# not installed" even though the binary file is genuinely present and
+# otherwise valid. Explicitly (re)add execute permission so a stripped
+# bit can't be the reason for that failure.
+try:
+    os.chmod(
+        FFMPEG_LOCATION,
+        os.stat(FFMPEG_LOCATION).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH,
+    )
+except OSError:
+    pass
 
 
 # =============================================================================
