@@ -55,18 +55,14 @@ selected_quality = (
 )
 
 info_col, download_col = st.columns(2)
-get_info_clicked = info_col.button(
-    "Get Info", use_container_width=True, disabled=not url, key="info_button"
-)
+get_info_clicked = info_col.button("Get Info", use_container_width=True, key="info_button")
 download_clicked = download_col.button(
-    "Download",
-    type="primary",
-    use_container_width=True,
-    disabled=not url,
-    key="download_button",
+    "Download", type="primary", use_container_width=True, key="download_button"
 )
 
-if get_info_clicked:
+if get_info_clicked and not url:
+    st.warning("Enter a video URL first.")
+elif get_info_clicked:
     with st.spinner("Fetching info..."):
         try:
             info = fetch_info(url)
@@ -91,7 +87,9 @@ if "last_info" in st.session_state:
         if meta:
             st.caption(meta)
 
-if download_clicked:
+if download_clicked and not url:
+    st.warning("Enter a video URL first.")
+elif download_clicked:
     progress_bar = st.progress(0.0)
     status_text = st.empty()
 

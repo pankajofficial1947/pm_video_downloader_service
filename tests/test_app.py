@@ -19,6 +19,35 @@ def test_renders_title():
     assert any(config.APP_TITLE in t.value for t in at.title)
 
 
+def test_buttons_are_never_disabled():
+    # Regression test: buttons used to be disabled=not url, which relies
+    # on a text_input rerun (Enter/blur) happening before the button is
+    # clicked. Clicking a button that was still disabled at click-time
+    # doesn't register, so pasting a URL and immediately clicking looked
+    # like the button was "stuck" disabled. Buttons must stay clickable;
+    # an empty URL is handled as a warning after the click instead.
+    at = _new_app()
+    at.run()
+    assert at.button(key="info_button").disabled is False
+    assert at.button(key="download_button").disabled is False
+
+
+def test_get_info_click_with_empty_url_shows_warning():
+    at = _new_app()
+    at.run()
+    at.button(key="info_button").click().run()
+    assert not at.exception
+    assert any("Enter a video URL" in w.value for w in at.warning)
+
+
+def test_download_click_with_empty_url_shows_warning():
+    at = _new_app()
+    at.run()
+    at.button(key="download_button").click().run()
+    assert not at.exception
+    assert any("Enter a video URL" in w.value for w in at.warning)
+
+
 def test_get_info_renders_video_metadata(monkeypatch):
     monkeypatch.setattr(
         "downloader.fetch_info",
