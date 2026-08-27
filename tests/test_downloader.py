@@ -78,6 +78,11 @@ def test_download_returns_bytes_and_reports_progress():
     assert result.title == "Sample Video"
     assert result.filename.endswith(".mp4")
     assert result.data == b"fake-media-bytes"
+    # "preparing"/"connecting" fire before any byte transfer starts, so the
+    # UI has something to show during yt-dlp's own (sometimes multi-second)
+    # metadata lookups instead of sitting frozen on its initial text.
+    assert events[0] == (0.0, "preparing")
+    assert (0.0, "connecting") in events
     assert events[-1] == (100.0, "completed")
     assert (50.0, "downloading") in events
     assert (99.0, "processing") in events

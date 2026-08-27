@@ -59,6 +59,16 @@ def download(
     or whatever yt-dlp itself raises (yt_dlp.utils.DownloadError etc.)
     on a bad URL or unsupported site.
     """
+    # Both the duration pre-check below and yt-dlp's own extract_info()
+    # call inside the real download can each take several real seconds
+    # (a full metadata fetch, not just a HEAD request) before any byte
+    # of the actual file has been requested - and progress_hooks only
+    # fire once byte transfer starts. Without these early callbacks the
+    # UI sits on its static initial text the whole time, indistinguishable
+    # from being frozen.
+    if progress_callback is not None:
+        progress_callback(0.0, "preparing")
+
     if config.MAX_VIDEO_DURATION_SECONDS:
         duration = fetch_info(url).get("duration")
         if duration and duration > config.MAX_VIDEO_DURATION_SECONDS:
@@ -66,6 +76,9 @@ def download(
                 f"Video duration ({duration:.0f}s) exceeds the configured "
                 f"limit ({config.MAX_VIDEO_DURATION_SECONDS}s)"
             )
+
+    if progress_callback is not None:
+        progress_callback(0.0, "connecting")
 
     job_id = uuid.uuid4().hex
 
