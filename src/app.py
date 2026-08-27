@@ -90,22 +90,20 @@ if "last_info" in st.session_state:
 if download_clicked and not url:
     st.warning("Enter a video URL first.")
 elif download_clicked:
-    progress_bar = st.progress(0.0)
-    status_text = st.empty()
+    progress_bar = st.progress(0.0, text="Starting... 0%")
 
     def on_progress(pct: float, status: str) -> None:
-        progress_bar.progress(min(pct, 100.0) / 100.0)
-        status_text.text(f"{status.capitalize()}... {pct:.0f}%")
+        pct = min(pct, 100.0)
+        progress_bar.progress(pct / 100.0, text=f"{status.capitalize()}... {pct:.0f}%")
 
     try:
         result = download(url, selected_format, selected_quality, progress_callback=on_progress)
     except Exception as exc:
-        status_text.empty()
         progress_bar.empty()
         st.error(str(exc))
         st.session_state.pop("last_result", None)
     else:
-        status_text.text("Done!")
+        progress_bar.progress(1.0, text="Done! 100%")
         st.session_state["last_result"] = result
 
 if "last_result" in st.session_state:
