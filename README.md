@@ -16,6 +16,7 @@ A [Streamlit](https://streamlit.io/) app that downloads videos or audio from You
 * [Configuration](#configuration)
 * [Running the Application](#running-the-application)
 * [Deploying to Streamlit Community Cloud](#deploying-to-streamlit-community-cloud)
+* [Known Limitations](#known-limitations)
 * [Testing](#testing)
 * [Security](#security)
 * [Future Enhancements](#future-enhancements)
@@ -150,6 +151,19 @@ This gets you a stable HTTPS URL reachable from any device, for free:
 No `packages.txt`/apt step is needed for ffmpeg - `imageio-ffmpeg` (in `requirements.txt`) handles that identically to your local machine.
 
 **Remember:** there is no login on this app (see [Security](#security)) - that URL works for anyone who has it.
+
+---
+
+# Known Limitations
+
+**YouTube downloads can fail on Streamlit Community Cloud specifically, with an error like "the source returned no video/audio data".** This happens because Streamlit Community Cloud runs on Google Cloud Platform, and YouTube's anti-bot system is known to block/throttle requests for actual video/audio bytes from datacenter IP ranges (AWS/GCP/Azure) even when metadata lookups (title, thumbnail, duration) succeed fine - a limitation of YouTube's own infrastructure, not a bug in this app. It's a widely reported issue across yt-dlp-based tools hosted this way, not specific to this codebase.
+
+Mitigations already in place (`src/downloader.py`):
+* Requests an alternate YouTube "player client" (`android`, falling back to `web`) - a commonly effective workaround, though not guaranteed as YouTube's countermeasures change over time.
+* Retries fragment/network failures automatically.
+* Surfaces a clear explanation instead of yt-dlp's raw internal error text when this happens.
+
+If it still fails: try again (some blocking is intermittent), try a different video, or run the app locally (`streamlit run src/app.py`) - this issue does not occur on a normal home/residential IP.
 
 ---
 

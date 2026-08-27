@@ -21,6 +21,17 @@ from models import DownloadFormat, DownloadResult, Quality
 
 ProgressCallback = Callable[[float, str], None]
 
+# Substrings seen in yt-dlp's own error text when a site (YouTube in
+# particular) has blocked/throttled this server's IP: metadata
+# extraction succeeds, but every request for actual video/audio bytes
+# comes back empty or refused. Best-effort pattern match, not
+# exhaustive - see download()'s docstring for the full explanation.
+_LIKELY_BLOCKED_INDICATORS = (
+    "downloaded file is empty",
+    "sign in to confirm",
+    "http error 403",
+)
+
 
 def fetch_info(url: str) -> dict:
     """Look up a video's metadata without downloading it."""
@@ -55,9 +66,13 @@ def download(
 ) -> DownloadResult:
     """Download a video/audio file and return it as in-memory bytes.
 
-    Raises ValueError if the source exceeds MAX_VIDEO_DURATION_SECONDS,
-    or whatever yt-dlp itself raises (yt_dlp.utils.DownloadError etc.)
-    on a bad URL or unsupported site.
+    Raises ValueError if the source exceeds MAX_VIDEO_DURATION_SECONDS.
+    Raises RuntimeError with a clearer message when the failure looks
+    like the source site blocking/throttling this server's IP (see
+    _LIKELY_BLOCKED_INDICATORS) - common for YouTube specifically when
+    running from a cloud platform's datacenter IP range, and not
+    something this app can reliably work around. Otherwise re-raises
+    whatever yt-dlp itself raised (yt_dlp.utils.DownloadError etc.).
     """
     # Both the duration pre-check below and yt-dlp's own extract_info()
     # call inside the real download can each take several real seconds
@@ -93,14 +108,28 @@ def download(
         elif d.get("status") == "finished":
             progress_callback(99.0, "processing")
 
-    with tempfile.TemporaryDirectory(prefix="video_downloader_") as tmpdir:
-        tmp_path = Path(tmpdir)
-        opts = _build_ydl_opts(tmp_path, job_id, fmt, quality, hook)
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(url, download=True)
+    try:
+        with tempfile.TemporaryDirectory(prefix="video_downloader_") as tmpdir:
+            tmp_path = Path(tmpdir)
+            opts = _build_ydl_opts(tmp_path, job_id, fmt, quality, hook)
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=True)
 
-        result_path = _resolve_downloaded_file(tmp_path, job_id)
-        data = result_path.read_bytes()
+            result_path = _resolve_downloaded_file(tmp_path, job_id)
+            data = result_path.read_bytes()
+    except Exception as exc:
+        message = str(exc).lower()
+        if any(indicator in message for indicator in _LIKELY_BLOCKED_INDICATORS):
+            raise RuntimeError(
+                "Download failed: the source returned no video/audio data. "
+                "This usually means the site (YouTube in particular) is "
+                "blocking or throttling requests from this server's IP "
+                "address, rather than a problem with this app - a known "
+                "limitation of running yt-dlp from a cloud platform. Try "
+                "again shortly, try a different video, or run this app "
+                "locally for more reliable downloads."
+            ) from exc
+        raise
 
     if progress_callback is not None:
         progress_callback(100.0, "completed")
@@ -127,6 +156,9 @@ def _build_ydl_opts(
         "noplaylist": True,
         "progress_hooks": [hook],
         "ffmpeg_location": config.FFMPEG_LOCATION,
+        "retries": 5,
+        "fragment_retries": 5,
+        "extractor_args": {"youtube": {"player_client": config.YOUTUBE_PLAYER_CLIENTS}},
     }
     if fmt == DownloadFormat.AUDIO:
         opts["format"] = "bestaudio/best"

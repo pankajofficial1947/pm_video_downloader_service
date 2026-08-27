@@ -119,6 +119,21 @@ def test_download_propagates_exception():
         download("https://youtube.com/watch?v=abc", DownloadFormat.VIDEO, Quality.BEST)
 
 
+def test_download_translates_likely_ip_block_into_clear_message():
+    _FakeYoutubeDL.raise_on_download = RuntimeError("ERROR: The downloaded file is empty")
+    with pytest.raises(RuntimeError, match="blocking or throttling"):
+        download("https://youtube.com/watch?v=abc", DownloadFormat.VIDEO, Quality.BEST)
+
+
+def test_opts_include_player_client_fallback_and_retries():
+    download("https://youtube.com/watch?v=abc", DownloadFormat.VIDEO, Quality.BEST)
+    download_call = next(c for c in _FakeYoutubeDL.calls if c["download"])
+    opts = download_call["opts"]
+    assert opts["extractor_args"] == {"youtube": {"player_client": config.YOUTUBE_PLAYER_CLIENTS}}
+    assert opts["retries"] == 5
+    assert opts["fragment_retries"] == 5
+
+
 def test_duration_over_limit_raises_without_downloading(monkeypatch):
     monkeypatch.setattr(config, "MAX_VIDEO_DURATION_SECONDS", 10)
     _FakeYoutubeDL.duration = 42

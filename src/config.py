@@ -74,3 +74,15 @@ QUALITY_FORMAT_MAP = {
 
 AUDIO_CODEC = "mp3"
 AUDIO_QUALITY = "192"
+
+# YouTube's default ("web") client requires fetching fragment URLs that
+# are more aggressively gated against datacenter/cloud-hosted IP
+# ranges (e.g. Streamlit Community Cloud runs on GCP) - metadata
+# extraction succeeds fine, but every actual video/audio byte request
+# comes back empty (see downloader.py's _LIKELY_BLOCKED_INDICATORS).
+# "android" is a commonly effective workaround since it uses a
+# simpler, less-gated request path; "web" stays as a fallback for
+# anything the android client itself can't resolve. Best-effort, not
+# guaranteed - YouTube's anti-bot measures evolve independently of
+# this app.
+YOUTUBE_PLAYER_CLIENTS = ["android", "web"]
