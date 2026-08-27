@@ -1,4 +1,4 @@
-# video_downloader_service
+# pm_video_downloader_service
 # 🎬 Video Downloader Service
 
 A password-gated [Streamlit](https://streamlit.io/) app that downloads videos or audio from YouTube and hundreds of other sites, powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp). Paste a URL, preview its title/thumbnail, pick a format/quality, and save the file - runs locally or free on Streamlit Community Cloud so it's reachable from your phone too.
@@ -62,7 +62,7 @@ Only download videos you own, that are in the public domain, or that you are oth
 # Project Structure
 
 ```
-video_downloader_service/
+pm_video_downloader_service/
 ├── .streamlit/
 │   ├── config.toml             # Theme
 │   └── secrets.toml.example    # Template for the password secret
@@ -91,8 +91,8 @@ video_downloader_service/
 ## 2. Clone the repository
 
 ```bash
-git clone https://github.com/pankajofficial1947/video_downloader_service.git
-cd video_downloader_service
+git clone https://github.com/pankajofficial1947/pm_video_downloader_service.git
+cd pm_video_downloader_service
 ```
 
 ## 3. Run the setup script
@@ -141,7 +141,7 @@ This gets you a stable HTTPS URL reachable from any device, for free:
 
 1. **Push this repo to GitHub** (Streamlit Community Cloud deploys from a GitHub repo):
    ```bash
-   gh repo create video_downloader_service --private --source=. --push
+   gh repo create pm_video_downloader_service --private --source=. --push
    ```
    (or create the repo on github.com and `git push` yourself).
 2. Go to **[share.streamlit.io](https://share.streamlit.io)**, sign in, and click **New app**.
